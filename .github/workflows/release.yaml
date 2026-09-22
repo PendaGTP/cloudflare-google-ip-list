@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      release_as:
+        description: Force next version (e.g. 1.2.0)
+        required: true
+        type: string
 
 jobs:
   release-please:
@@ -21,6 +27,7 @@ jobs:
         id: release
         with:
           release-type: node
+          release-as: ${{ inputs.release_as }}
 
   release:
     runs-on: ubuntu-latest
