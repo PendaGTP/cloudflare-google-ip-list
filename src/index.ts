@@ -63,9 +63,35 @@ type CloudflareBulkOperationStatusResponse = {
 	messages: unknown[];
 };
 
+type SyncOutcome =
+	| { kind: 'skipped'; cidrCount: number; listId: string; listName: string }
+	| { kind: 'complete'; cidrCount: number; listId: string; listName: string; listCreated: boolean; operationId: string };
+
+type SyncOptions = {
+	scheduledTime?: number;
+};
+
+function errorFields(err: unknown): { message: string; stack?: string } {
+	if (err instanceof Error) {
+		return { message: err.message, stack: err.stack };
+	}
+	return { message: String(err) };
+}
+
 export default {
-	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-		ctx.waitUntil(sync(env).catch((err) => console.error('sync failed', err)));
+	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+		const { scheduledTime } = controller;
+		ctx.waitUntil(
+			sync(env, { scheduledTime }).catch((err) => {
+				console.error({
+					event: 'sync.failed',
+					listName: env.IP_LIST_NAME,
+					scheduledTime,
+					...errorFields(err),
+				});
+				throw err;
+			}),
+		);
 	},
 } satisfies ExportedHandler<Env>;
 
@@ -172,7 +198,16 @@ async function hashCidrs(cidrs: string[]) {
 	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function sync(env: Env) {
+async function sync(env: Env, options: SyncOptions = {}): Promise<SyncOutcome> {
+	const startedAt = Date.now();
+	const { scheduledTime } = options;
+
+	console.log({
+		event: 'sync.start',
+		listName: env.IP_LIST_NAME,
+		scheduledTime,
+	});
+
 	const res = await fetch(env.GOOGLE_IP_RANGES_URL);
 	if (!res.ok) throw new Error(`Failed to fetch Google IP ranges: ${res.statusText}`);
 
@@ -185,14 +220,33 @@ async function sync(env: Env) {
 	const hash = await hashCidrs(cidrs);
 	const [stored, existing] = await Promise.all([env.STATE.get(cidrHashKey(env.IP_LIST_NAME)), findIpList(env)]);
 
+	const listCreated = !existing;
 	const list = existing ?? (await createIpList(env));
 	if (existing && stored === hash && existing.num_items === cidrs.length) {
-		return `Unchanged ${cidrs.length} IP ranges; skipped update of ${list.name}`;
+		console.log({
+			event: 'sync.skipped',
+			listName: env.IP_LIST_NAME,
+			cidrCount: cidrs.length,
+			listId: list.id,
+			scheduledTime,
+			durationMs: Date.now() - startedAt,
+		});
+		return { kind: 'skipped', cidrCount: cidrs.length, listId: list.id, listName: list.name };
 	}
 
 	const operationId = await updateIpList(env, list.id, cidrs);
 	await waitForBulkOperation(env, operationId);
 	await env.STATE.put(cidrHashKey(env.IP_LIST_NAME), hash);
 
-	return `Synced ${cidrs.length} IP ranges to Cloudflare IP list ${list.name}`;
+	console.log({
+		event: 'sync.complete',
+		listName: env.IP_LIST_NAME,
+		cidrCount: cidrs.length,
+		listId: list.id,
+		listCreated,
+		operationId,
+		scheduledTime,
+		durationMs: Date.now() - startedAt,
+	});
+	return { kind: 'complete', cidrCount: cidrs.length, listId: list.id, listName: list.name, listCreated, operationId };
 }
