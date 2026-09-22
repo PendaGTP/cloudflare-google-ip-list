@@ -2,21 +2,35 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
-
-permissions:
-  contents: write
+    branches:
+      - main
 
 jobs:
-  build-and-release:
+  release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          release-type: node
+
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -29,19 +43,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Generate checksum
+      - name: Generate artefact checksums
         run: sha256sum dist/index.js > dist/index.js.sha256
 
-      - name: Generate changelog
-        id: changelog
-        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4.9.1
+      - name: Upload artefact
         env:
-          OUTPUT: CHANGELOG.md
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          body_path: ${{ steps.changelog.outputs.changelog }}
-          files: |
-            dist/index.js
-            dist/index.js.sha256
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ steps.release.outputs.tag_name }} dist/index.js dist/index.js.sha256
