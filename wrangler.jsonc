@@ -16,7 +16,10 @@
 		"IP_LIST_NAME": "google-ip-list"
 	},
 	"secrets": {
-		"required": ["CLOUDFLARE_API_TOKEN", "ACCOUNT_ID"]
+		"required": [
+			"CLOUDFLARE_API_TOKEN",
+			"ACCOUNT_ID"
+		]
 	},
 	"kv_namespaces": [
 		{
@@ -26,8 +29,10 @@
 		}
 	],
 	"triggers": {
-		"crons": ["0 */6 * * *"]
-	}
+		"crons": [
+			"0 */6 * * *"
+		]
+	},
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
