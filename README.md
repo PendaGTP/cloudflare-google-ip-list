@@ -32,8 +32,7 @@ npx wrangler secret put ACCOUNT_ID
 
 ### 3. API token permissions
 
-- Rules & Configuration
-  - Account Rules List - Read / Write
+- Rules & Configuration - Account Rules List - Read / Write
 
 ### 4. Deploy
 
