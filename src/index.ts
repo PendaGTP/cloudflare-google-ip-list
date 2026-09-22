@@ -103,7 +103,9 @@ async function findIpList(env: Env) {
 	});
 
 	const data = await res.json<CloudflareListsResponse>();
-	if (!res.ok || !data.success) throw new Error(`Failed to fetch Cloudflare IP lists: ${res.statusText}`);
+	if (!res.ok || !data.success) {
+		throw new Error(`Failed to fetch Cloudflare IP lists: ${res.statusText}`);
+	}
 
 	return data.result.find((list) => list.name === env.IP_LIST_NAME);
 }
@@ -125,8 +127,11 @@ async function createIpList(env: Env) {
 	const data = await res.json<CloudflareListResponse>();
 	if (!res.ok || !data.success) {
 		let message;
-		if (data.errors.length == 0) message = JSON.stringify(data);
-		else message = data.errors.map((error) => error.message).join(', ');
+		if (data.errors.length == 0) {
+			message = JSON.stringify(data);
+		} else {
+			message = data.errors.map((error) => error.message).join(', ');
+		}
 		throw new Error(`Failed to create Cloudflare IP list: ${message}`);
 	}
 
@@ -168,7 +173,9 @@ async function waitForBulkOperation(env: Env, operationId: string, options: { in
 				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
 			},
 		});
-		if (!res.ok) throw new Error(`Failed to fetch bulk operation status: ${res.statusText}`);
+		if (!res.ok) {
+			throw new Error(`Failed to fetch bulk operation status: ${res.statusText}`);
+		}
 
 		const data = await res.json<CloudflareBulkOperationStatusResponse>();
 		if (!data.success || !data.result) {
@@ -177,7 +184,9 @@ async function waitForBulkOperation(env: Env, operationId: string, options: { in
 		}
 
 		const { status, error } = data.result;
-		if (status === 'completed') return;
+		if (status === 'completed') {
+			return;
+		}
 		if (status === 'failed') {
 			throw new Error(`Bulk operation failed: ${error ?? 'unknown error'}`);
 		}
@@ -209,13 +218,15 @@ async function sync(env: Env, options: SyncOptions = {}): Promise<SyncOutcome> {
 	});
 
 	const res = await fetch(env.GOOGLE_IP_RANGES_URL);
-	if (!res.ok) throw new Error(`Failed to fetch Google IP ranges: ${res.statusText}`);
+	if (!res.ok) {
+		throw new Error(`Failed to fetch Google IP ranges: ${res.statusText}`);
+	}
 
 	const data = await res.json<GoogleIpRanges>();
 	const cidrs = data.prefixes
 		.map((prefix) => prefix.ipv4Prefix ?? prefix.ipv6Prefix)
 		.filter((cidr): cidr is string => cidr !== undefined)
-		.sort();
+		.toSorted();
 
 	const hash = await hashCidrs(cidrs);
 	const [stored, existing] = await Promise.all([env.STATE.get(cidrHashKey(env.IP_LIST_NAME)), findIpList(env)]);

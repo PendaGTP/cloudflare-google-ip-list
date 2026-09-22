@@ -8,11 +8,14 @@
     "start": "wrangler dev",
     "test": "vitest",
     "cf-typegen": "wrangler types",
-    "build": "wrangler deploy --dry-run --outdir dist"
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix ."
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.0.0",
     "@types/node": "^26.6.2",
+    "oxlint": "^1.85.0",
     "typescript": "^5.5.2",
     "vitest": "~4.1.0",
     "wrangler": "^4.136.1"

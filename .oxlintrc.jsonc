@@ -1,0 +1,31 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "import", "unicorn", "promise"],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn"
+	},
+	"ignorePatterns": ["dist/**", "worker-configuration.d.ts"],
+	"rules": {
+		"typescript/no-explicit-any": "error",
+		"typescript/consistent-type-imports": ["error", { "disallowTypeAnnotations": false }],
+		"typescript/no-non-null-assertion": "error",
+		"no-var": "error",
+		"prefer-const": "error",
+		"curly": ["error", "all"],
+		"no-unused-vars": [
+			"error",
+			{ "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "ignoreRestSiblings": true }
+		]
+	},
+	"overrides": [
+		{
+			"files": ["test/**/*.{ts,mts}"],
+			"plugins": ["vitest"],
+			"rules": {
+				"no-console": "off",
+				"vitest/no-focused-tests": "error"
+			}
+		}
+	]
+}

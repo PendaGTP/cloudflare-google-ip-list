@@ -54,5 +54,7 @@ npm run deploy
 
 ```bash
 npm run dev
+npm run lint
+npm run lint:fix
 ```
 
