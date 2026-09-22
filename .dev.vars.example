@@ -1,0 +1,8 @@
+# Copy to `.dev.vars` and fill in values for local development (`npm run dev`).
+#
+# For production, set the same names with:
+#   npx wrangler secret put CLOUDFLARE_API_TOKEN
+#   npx wrangler secret put ACCOUNT_ID
+
+CLOUDFLARE_API_TOKEN=
+ACCOUNT_ID=
