@@ -13,7 +13,7 @@
 	"upload_source_maps": true,
 	"vars": {
 		"GOOGLE_IP_RANGES_URL": "https://www.gstatic.com/ipranges/goog.json",
-		"IP_LIST_NAME": "google-ip-list"
+		"IP_LIST_NAME": "google"
 	},
 	"secrets": {
 		"required": [
