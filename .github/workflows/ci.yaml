@@ -31,5 +31,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check generated types
+        run: npx wrangler types --check
+
       - name: Build
         run: npm run build
