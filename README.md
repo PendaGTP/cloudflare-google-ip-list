@@ -119,7 +119,7 @@ The worker logs structured events that you can search in Workers Observability:
 
 ## Limits
 
-Cloudflare limits custom lists per account ([current limits](https:****//developers.cloudflare.com/waf/tools/lists/#availability)):
+Cloudflare limits custom lists per account ([current limits](https://developers.cloudflare.com/waf/tools/lists/#availability)):
 
 | Plan           | Custom lists | List items (total) |
 | -------------- | ------------ | ------------------ |
