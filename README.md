@@ -110,12 +110,12 @@ On each cron trigger, the worker:
 
 The worker logs structured events that you can search in Workers Observability:
 
-| Event           | Meaning                                                                      |
-| --------------- | ---------------------------------------------------------------------------- |
-| `sync.start`    | A sync began.                                                                |
-| `sync.skipped`  | The ranges hadn't changed; nothing was written.                              |
+| Event           | Meaning                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `sync.start`    | A sync began.                                                                             |
+| `sync.skipped`  | The ranges hadn't changed; nothing was written.                                           |
 | `sync.complete` | The list was updated. Includes `cidrCount`, `listCreated`, `pollCount`, and `durationMs`. |
-| `sync.failed`   | The sync failed. Includes the error `message`.                               |
+| `sync.failed`   | The sync failed. Includes the error `message`.                                            |
 
 ## Limits
 

@@ -3,7 +3,7 @@
 	"plugins": ["typescript", "import", "unicorn", "promise"],
 	"categories": {
 		"correctness": "error",
-		"suspicious": "warn"
+		"suspicious": "warn",
 	},
 	"ignorePatterns": ["dist/**", "worker-configuration.d.ts"],
 	"rules": {
@@ -13,10 +13,7 @@
 		"no-var": "error",
 		"prefer-const": "error",
 		"curly": ["error", "all"],
-		"no-unused-vars": [
-			"error",
-			{ "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "ignoreRestSiblings": true }
-		]
+		"no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "ignoreRestSiblings": true }],
 	},
 	"overrides": [
 		{
@@ -24,8 +21,8 @@
 			"plugins": ["vitest"],
 			"rules": {
 				"no-console": "off",
-				"vitest/no-focused-tests": "error"
-			}
-		}
-	]
+				"vitest/no-focused-tests": "error",
+			},
+		},
+	],
 }
