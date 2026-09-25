@@ -36,29 +36,8 @@ type CloudflareAccount = {
 	name: string;
 };
 
-type CloudflareAccountsResponse = {
-	result: CloudflareAccount[];
-	success: boolean;
-	errors: CloudflareApiError[];
-	messages: unknown[];
-};
-
-type CloudflareListsResponse = {
-	result: CloudflareIpList[];
-	success: boolean;
-	errors: CloudflareApiError[];
-	messages: unknown[];
-};
-
-type CloudflareListResponse = {
-	result: CloudflareIpList;
-	success: boolean;
-	errors: CloudflareApiError[];
-	messages: unknown[];
-};
-
-type CloudflareBulkOperationResponse = {
-	result: { operation_id: string } | null;
+type CloudflareApiResponse<T> = {
+	result: T;
 	success: boolean;
 	errors: CloudflareApiError[];
 	messages: unknown[];
@@ -66,15 +45,10 @@ type CloudflareBulkOperationResponse = {
 
 type BulkOperationStatus = 'pending' | 'running' | 'completed' | 'failed';
 
-type CloudflareBulkOperationStatusResponse = {
-	result: {
-		id: string;
-		status: BulkOperationStatus;
-		error?: string;
-	} | null;
-	success: boolean;
-	errors: CloudflareApiError[];
-	messages: unknown[];
+type CloudflareBulkOperation = {
+	id: string;
+	status: BulkOperationStatus;
+	error?: string;
 };
 
 type SyncOutcome =
@@ -109,88 +83,66 @@ export default {
 	},
 } satisfies ExportedHandler<Env>;
 
-async function resolveAccountId(env: Env) {
-	if (env.ACCOUNT_ID) {
-		return env.ACCOUNT_ID;
-	}
-
-	const res = await fetch(`${CLOUDFLARE_API}/accounts`, {
+/** Calls the Cloudflare API and returns `result`, throwing `Failed to <action>: …` on any HTTP or API error. */
+async function cfApi<T>(env: Env, path: string, action: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+	const res = await fetch(`${CLOUDFLARE_API}${path}`, {
+		method: init.method ?? 'GET',
 		headers: {
 			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+			...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
 		},
+		body: init.body === undefined ? undefined : JSON.stringify(init.body),
 	});
 
-	const data = await res.json<CloudflareAccountsResponse>();
-	if (!res.ok || !data.success) {
-		throw new Error(`Failed to fetch Cloudflare accounts: ${res.statusText}`);
-	}
-	if (data.result.length !== 1) {
-		throw new Error(`API token has access to ${data.result.length} accounts; set ACCOUNT_ID to choose one`);
-	}
-
-	return data.result[0].id;
-}
-
-async function findIpList(env: Env, accountId: string) {
-	const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists`, {
-		headers: {
-			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-		},
-	});
-
-	const data = await res.json<CloudflareListsResponse>();
-	if (!res.ok || !data.success) {
-		throw new Error(`Failed to fetch Cloudflare IP lists: ${res.statusText}`);
+	let data: CloudflareApiResponse<T> | undefined;
+	try {
+		data = await res.json<CloudflareApiResponse<T>>();
+	} catch {
+		// Non-JSON body, e.g. an HTML error page from a proxy.
 	}
 
-	return data.result.find((list) => list.name === env.IP_LIST_NAME);
-}
-
-async function createIpList(env: Env, accountId: string) {
-	const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists`, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify({
-			name: env.IP_LIST_NAME,
-			kind: 'ip',
-			description: 'Google IP ranges',
-		}),
-	});
-
-	const data = await res.json<CloudflareListResponse>();
-	if (!res.ok || !data.success) {
-		let message;
-		if (data.errors.length == 0) {
-			message = JSON.stringify(data);
-		} else {
-			message = data.errors.map((error) => error.message).join(', ');
-		}
-		throw new Error(`Failed to create Cloudflare IP list: ${message}`);
+	if (!res.ok || !data?.success) {
+		const details = data?.errors?.length ? data.errors.map((error) => `${error.message} (${error.code})`).join(', ') : 'no error details';
+		throw new Error(`Failed to ${action}: HTTP ${res.status}, ${details}`);
 	}
 
 	return data.result;
 }
 
-async function updateIpList(env: Env, accountId: string, listId: string, cidrs: string[]) {
-	const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists/${listId}/items`, {
-		method: 'PUT',
-		headers: {
-			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(cidrs.map((cidr) => ({ ip: cidr }))),
-	});
-
-	const data = await res.json<CloudflareBulkOperationResponse>();
-	if (!res.ok || !data.success) {
-		const message = data.errors.map((error) => error.message).join(', ');
-		throw new Error(`Failed to update Cloudflare IP list: ${message}`);
+async function resolveAccountId(env: Env) {
+	if (env.ACCOUNT_ID) {
+		return env.ACCOUNT_ID;
 	}
 
-	const operationId = data.result?.operation_id;
+	const accounts = await cfApi<CloudflareAccount[]>(env, '/accounts', 'fetch Cloudflare accounts');
+	if (accounts.length !== 1) {
+		throw new Error(`API token has access to ${accounts.length} accounts; set ACCOUNT_ID to choose one`);
+	}
+
+	return accounts[0].id;
+}
+
+async function findIpList(env: Env, accountId: string) {
+	const lists = await cfApi<CloudflareIpList[]>(env, `/accounts/${accountId}/rules/lists`, 'fetch Cloudflare IP lists');
+	return lists.find((list) => list.name === env.IP_LIST_NAME);
+}
+
+async function createIpList(env: Env, accountId: string) {
+	return cfApi<CloudflareIpList>(env, `/accounts/${accountId}/rules/lists`, 'create Cloudflare IP list', {
+		method: 'POST',
+		body: { name: env.IP_LIST_NAME, kind: 'ip', description: 'Google IP ranges' },
+	});
+}
+
+async function updateIpList(env: Env, accountId: string, listId: string, cidrs: string[]) {
+	const result = await cfApi<{ operation_id: string } | null>(
+		env,
+		`/accounts/${accountId}/rules/lists/${listId}/items`,
+		'update Cloudflare IP list',
+		{ method: 'PUT', body: cidrs.map((cidr) => ({ ip: cidr })) },
+	);
+
+	const operationId = result?.operation_id;
 	if (!operationId) {
 		throw new Error('Failed to update Cloudflare IP list: missing operation_id');
 	}
@@ -221,22 +173,16 @@ export async function waitForBulkOperation(env: Env, accountId: string, operatio
 	let attempts = 0;
 	while (attempts < maxAttempts && Date.now() < deadline) {
 		attempts++;
-		const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists/bulk_operations/${operationId}`, {
-			headers: {
-				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-			},
-		});
-		if (!res.ok) {
-			throw new Error(`Failed to fetch bulk operation status: ${res.statusText}`);
+		const operation = await cfApi<CloudflareBulkOperation | null>(
+			env,
+			`/accounts/${accountId}/rules/lists/bulk_operations/${operationId}`,
+			'fetch bulk operation status',
+		);
+		if (!operation) {
+			throw new Error('Failed to fetch bulk operation status: empty result');
 		}
 
-		const data = await res.json<CloudflareBulkOperationStatusResponse>();
-		if (!data.success || !data.result) {
-			const message = data.errors.map((error) => error.message).join(', ');
-			throw new Error(`Failed to fetch bulk operation status: ${message}`);
-		}
-
-		const { status, error } = data.result;
+		const { status, error } = operation;
 		if (status === 'completed') {
 			return attempts;
 		}
