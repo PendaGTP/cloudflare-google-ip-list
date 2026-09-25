@@ -29,6 +29,18 @@ type CloudflareApiError = {
 	message: string;
 };
 
+type CloudflareAccount = {
+	id: string;
+	name: string;
+};
+
+type CloudflareAccountsResponse = {
+	result: CloudflareAccount[];
+	success: boolean;
+	errors: CloudflareApiError[];
+	messages: unknown[];
+};
+
 type CloudflareListsResponse = {
 	result: CloudflareIpList[];
 	success: boolean;
@@ -95,8 +107,30 @@ export default {
 	},
 } satisfies ExportedHandler<Env>;
 
-async function findIpList(env: Env) {
-	const res = await fetch(`${CLOUDFLARE_API}/accounts/${env.ACCOUNT_ID}/rules/lists`, {
+async function resolveAccountId(env: Env) {
+	if (env.ACCOUNT_ID) {
+		return env.ACCOUNT_ID;
+	}
+
+	const res = await fetch(`${CLOUDFLARE_API}/accounts`, {
+		headers: {
+			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+		},
+	});
+
+	const data = await res.json<CloudflareAccountsResponse>();
+	if (!res.ok || !data.success) {
+		throw new Error(`Failed to fetch Cloudflare accounts: ${res.statusText}`);
+	}
+	if (data.result.length !== 1) {
+		throw new Error(`API token has access to ${data.result.length} accounts; set ACCOUNT_ID to choose one`);
+	}
+
+	return data.result[0].id;
+}
+
+async function findIpList(env: Env, accountId: string) {
+	const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists`, {
 		headers: {
 			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
 		},
@@ -110,8 +144,8 @@ async function findIpList(env: Env) {
 	return data.result.find((list) => list.name === env.IP_LIST_NAME);
 }
 
-async function createIpList(env: Env) {
-	const res = await fetch(`${CLOUDFLARE_API}/accounts/${env.ACCOUNT_ID}/rules/lists`, {
+async function createIpList(env: Env, accountId: string) {
+	const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists`, {
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
@@ -138,8 +172,8 @@ async function createIpList(env: Env) {
 	return data.result;
 }
 
-async function updateIpList(env: Env, listId: string, cidrs: string[]) {
-	const res = await fetch(`${CLOUDFLARE_API}/accounts/${env.ACCOUNT_ID}/rules/lists/${listId}/items`, {
+async function updateIpList(env: Env, accountId: string, listId: string, cidrs: string[]) {
+	const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists/${listId}/items`, {
 		method: 'PUT',
 		headers: {
 			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
@@ -162,13 +196,13 @@ async function updateIpList(env: Env, listId: string, cidrs: string[]) {
 	return operationId;
 }
 
-async function waitForBulkOperation(env: Env, operationId: string, options: { intervalMs?: number; timeoutMs?: number } = {}) {
+async function waitForBulkOperation(env: Env, accountId: string, operationId: string, options: { intervalMs?: number; timeoutMs?: number } = {}) {
 	const intervalMs = options.intervalMs ?? BULK_POLL_INTERVAL_MS;
 	const timeoutMs = options.timeoutMs ?? BULK_POLL_TIMEOUT_MS;
 	const deadline = Date.now() + timeoutMs;
 
 	while (Date.now() < deadline) {
-		const res = await fetch(`${CLOUDFLARE_API}/accounts/${env.ACCOUNT_ID}/rules/lists/bulk_operations/${operationId}`, {
+		const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists/bulk_operations/${operationId}`, {
 			headers: {
 				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
 			},
@@ -229,10 +263,11 @@ async function sync(env: Env, options: SyncOptions = {}): Promise<SyncOutcome> {
 		.toSorted();
 
 	const hash = await hashCidrs(cidrs);
-	const [stored, existing] = await Promise.all([env.STATE.get(cidrHashKey(env.IP_LIST_NAME)), findIpList(env)]);
+	const accountId = await resolveAccountId(env);
+	const [stored, existing] = await Promise.all([env.STATE.get(cidrHashKey(env.IP_LIST_NAME)), findIpList(env, accountId)]);
 
 	const listCreated = !existing;
-	const list = existing ?? (await createIpList(env));
+	const list = existing ?? (await createIpList(env, accountId));
 	if (existing && stored === hash && existing.num_items === cidrs.length) {
 		console.log({
 			event: 'sync.skipped',
@@ -245,8 +280,8 @@ async function sync(env: Env, options: SyncOptions = {}): Promise<SyncOutcome> {
 		return { kind: 'skipped', cidrCount: cidrs.length, listId: list.id, listName: list.name };
 	}
 
-	const operationId = await updateIpList(env, list.id, cidrs);
-	await waitForBulkOperation(env, operationId);
+	const operationId = await updateIpList(env, accountId, list.id, cidrs);
+	await waitForBulkOperation(env, accountId, operationId);
 	await env.STATE.put(cidrHashKey(env.IP_LIST_NAME), hash);
 
 	console.log({
