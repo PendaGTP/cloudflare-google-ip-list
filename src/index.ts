@@ -1,7 +1,9 @@
 const CLOUDFLARE_API = 'https://api.cloudflare.com/client/v4';
 
-const BULK_POLL_INTERVAL_MS = 1_000;
+const BULK_POLL_INITIAL_DELAY_MS = 1_000;
+const BULK_POLL_MAX_DELAY_MS = 10_000;
 const BULK_POLL_TIMEOUT_MS = 120_000;
+const BULK_POLL_MAX_ATTEMPTS = 25;
 
 type GoogleIpPrefix = {
 	ipv4Prefix?: string;
@@ -196,12 +198,29 @@ async function updateIpList(env: Env, accountId: string, listId: string, cidrs: 
 	return operationId;
 }
 
-async function waitForBulkOperation(env: Env, accountId: string, operationId: string, options: { intervalMs?: number; timeoutMs?: number } = {}) {
-	const intervalMs = options.intervalMs ?? BULK_POLL_INTERVAL_MS;
-	const timeoutMs = options.timeoutMs ?? BULK_POLL_TIMEOUT_MS;
-	const deadline = Date.now() + timeoutMs;
+type BulkPollOptions = {
+	initialDelayMs?: number;
+	maxDelayMs?: number;
+	timeoutMs?: number;
+	maxAttempts?: number;
+};
 
-	while (Date.now() < deadline) {
+export function bulkPollDelay(attempt: number, initialDelayMs = BULK_POLL_INITIAL_DELAY_MS, maxDelayMs = BULK_POLL_MAX_DELAY_MS) {
+	return Math.min(initialDelayMs * 2 ** attempt, maxDelayMs);
+}
+
+/** Polls the bulk operation until it completes and returns the number of status requests made. */
+export async function waitForBulkOperation(env: Env, accountId: string, operationId: string, options: BulkPollOptions = {}) {
+	const initialDelayMs = options.initialDelayMs ?? BULK_POLL_INITIAL_DELAY_MS;
+	const maxDelayMs = options.maxDelayMs ?? BULK_POLL_MAX_DELAY_MS;
+	const timeoutMs = options.timeoutMs ?? BULK_POLL_TIMEOUT_MS;
+	const maxAttempts = options.maxAttempts ?? BULK_POLL_MAX_ATTEMPTS;
+	const startedAt = Date.now();
+	const deadline = startedAt + timeoutMs;
+
+	let attempts = 0;
+	while (attempts < maxAttempts && Date.now() < deadline) {
+		attempts++;
 		const res = await fetch(`${CLOUDFLARE_API}/accounts/${accountId}/rules/lists/bulk_operations/${operationId}`, {
 			headers: {
 				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
@@ -219,16 +238,19 @@ async function waitForBulkOperation(env: Env, accountId: string, operationId: st
 
 		const { status, error } = data.result;
 		if (status === 'completed') {
-			return;
+			return attempts;
 		}
 		if (status === 'failed') {
 			throw new Error(`Bulk operation failed: ${error ?? 'unknown error'}`);
 		}
 
-		await new Promise((resolve) => setTimeout(resolve, intervalMs));
+		const delayMs = Math.min(bulkPollDelay(attempts - 1, initialDelayMs, maxDelayMs), deadline - Date.now());
+		if (delayMs > 0) {
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+		}
 	}
 
-	throw new Error(`Bulk operation timed out after ${timeoutMs}ms`);
+	throw new Error(`Bulk operation ${operationId} timed out after ${attempts} polls / ${Date.now() - startedAt}ms`);
 }
 
 function cidrHashKey(listName: string) {
@@ -281,7 +303,7 @@ async function sync(env: Env, options: SyncOptions = {}): Promise<SyncOutcome> {
 	}
 
 	const operationId = await updateIpList(env, accountId, list.id, cidrs);
-	await waitForBulkOperation(env, accountId, operationId);
+	const pollCount = await waitForBulkOperation(env, accountId, operationId);
 	await env.STATE.put(cidrHashKey(env.IP_LIST_NAME), hash);
 
 	console.log({
@@ -291,6 +313,7 @@ async function sync(env: Env, options: SyncOptions = {}): Promise<SyncOutcome> {
 		listId: list.id,
 		listCreated,
 		operationId,
+		pollCount,
 		scheduledTime,
 		durationMs: Date.now() - startedAt,
 	});

@@ -114,7 +114,7 @@ The worker logs structured events that you can search in Workers Observability:
 | --------------- | ---------------------------------------------------------------------------- |
 | `sync.start`    | A sync began.                                                                |
 | `sync.skipped`  | The ranges hadn't changed; nothing was written.                              |
-| `sync.complete` | The list was updated. Includes `cidrCount`, `listCreated`, and `durationMs`. |
+| `sync.complete` | The list was updated. Includes `cidrCount`, `listCreated`, `pollCount`, and `durationMs`. |
 | `sync.failed`   | The sync failed. Includes the error `message`.                               |
 
 ## Limits
@@ -137,7 +137,7 @@ Cloudflare limits custom lists per account ([current limits](https:****//develop
 | `API token has access to N accounts; set ACCOUNT_ID to choose one`            | Set `ACCOUNT_ID` to the account that should own the list.                           |
 | `Failed to fetch Cloudflare IP lists` / `Failed to create Cloudflare IP list` | The token is invalid or is missing **Account Filter Lists: Edit** for this account. |
 | `Failed to create Cloudflare IP list: …limit…`                                | The account already has as many lists as its plan allows.                           |
-| `Bulk operation timed out`                                                    | Cloudflare didn't finish the update within 2 minutes. The next run retries.         |
+| `Bulk operation … timed out`                                                  | Cloudflare didn't finish the update within 2 minutes. The next run retries.         |
 
 ## Development
 
