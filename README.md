@@ -100,7 +100,7 @@ To keep several lists in sync, deploy the worker once per source with a differen
 
 On each cron trigger, the worker:
 
-1. Downloads the ranges from `GOOGLE_IP_RANGES_URL` and collects every IPv4 and IPv6 prefix.
+1. Downloads the ranges from `GOOGLE_IP_RANGES_URL` and collects every IPv4 and IPv6 prefix. If the download contains no prefixes, the sync fails and the list is left untouched.
 2. Looks for a list named `IP_LIST_NAME` in the account and creates it if it doesn't exist.
 3. Compares a hash of the ranges with the hash stored in KV from the last successful sync. If the ranges and the list's item count haven't changed, it stops here.
 4. Otherwise it **replaces every item in the list** with the downloaded ranges, waits for Cloudflare to finish the bulk update (up to 2 minutes), and stores the new hash.
@@ -131,13 +131,14 @@ Cloudflare limits custom lists per account ([current limits](https://developers.
 
 ## Troubleshooting
 
-| Error in `sync.failed`                                                        | Cause                                                                               |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `Failed to fetch Cloudflare accounts`                                         | `ACCOUNT_ID` is unset and the token can't list accounts. Set `ACCOUNT_ID`.          |
-| `API token has access to N accounts; set ACCOUNT_ID to choose one`            | Set `ACCOUNT_ID` to the account that should own the list.                           |
-| `Failed to fetch Cloudflare IP lists` / `Failed to create Cloudflare IP list` | The token is invalid or is missing **Account Filter Lists: Edit** for this account. |
-| `Failed to create Cloudflare IP list: …limit…`                                | The account already has as many lists as its plan allows.                           |
-| `Bulk operation … timed out`                                                  | Cloudflare didn't finish the update within 2 minutes. The next run retries.         |
+| Error in `sync.failed`                                                        | Cause                                                                                |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Failed to fetch Cloudflare accounts`                                         | `ACCOUNT_ID` is unset and the token can't list accounts. Set `ACCOUNT_ID`.           |
+| `API token has access to N accounts; set ACCOUNT_ID to choose one`            | Set `ACCOUNT_ID` to the account that should own the list.                            |
+| `Failed to fetch Cloudflare IP lists` / `Failed to create Cloudflare IP list` | The token is invalid or is missing **Account Filter Lists: Edit** for this account.  |
+| `Failed to create Cloudflare IP list: …limit…`                                | The account already has as many lists as its plan allows.                            |
+| `Google IP ranges contain no prefixes; refusing to empty the list`            | Google returned no prefixes. The list keeps its current items. The next run retries. |
+| `Bulk operation … timed out`                                                  | Cloudflare didn't finish the update within 2 minutes. The next run retries.          |
 
 ## Development
 

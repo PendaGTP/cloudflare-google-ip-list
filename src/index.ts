@@ -225,10 +225,15 @@ async function sync(env: Env, options: SyncOptions = {}): Promise<SyncOutcome> {
 	}
 
 	const data = await res.json<GoogleIpRanges>();
-	const cidrs = data.prefixes
+	const cidrs = (data.prefixes ?? [])
 		.map((prefix) => prefix.ipv4Prefix ?? prefix.ipv6Prefix)
 		.filter((cidr): cidr is string => cidr !== undefined)
 		.toSorted();
+
+	// An empty download would wipe the list, so treat it as a failure and leave the list as it is.
+	if (cidrs.length === 0) {
+		throw new Error('Google IP ranges contain no prefixes; refusing to empty the list');
+	}
 
 	const hash = await hashCidrs(cidrs);
 	const accountId = await resolveAccountId(env);
