@@ -24,10 +24,11 @@ Once the list exists, you can reference it from WAF custom rules, rate limiting 
 
 Click **Deploy to Cloudflare** above. Cloudflare forks this repository into your GitHub account, creates the KV namespace, and asks for:
 
-| Name                   | Required | Value                                                          |
-| ---------------------- | -------- | -------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN` | Yes      | The token from step 1.                                         |
-| `ACCOUNT_ID`           | No       | Leave empty unless the token can access more than one account. |
+| Name                   | Required | Value                  |
+| ---------------------- | -------- | ---------------------- |
+| `CLOUDFLARE_API_TOKEN` | Yes      | The token from step 1. |
+
+If the token can access more than one account, set `ACCOUNT_ID` in `wrangler.jsonc` in your fork and push. The fork redeploys on push. See [Configuration](#configuration).
 
 ### 2b. Deploy from a clone
 
@@ -71,17 +72,17 @@ Rules can also exclude the list:
 
 Set these in the `vars` section of [`wrangler.jsonc`](wrangler.jsonc) and redeploy:
 
-| Variable               | Default                                      | Description                                                                                                                 |
-| ---------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `GOOGLE_IP_RANGES_URL` | `https://www.gstatic.com/ipranges/goog.json` | Source of the IP ranges. Any URL that returns Google's `{"prefixes": [{"ipv4Prefix": …}, {"ipv6Prefix": …}]}` format works. |
-| `IP_LIST_NAME`         | `google`                                     | Name of the Cloudflare list to create and keep in sync. This is the name you use in rule expressions.                       |
+| Variable               | Default                                      | Description                                                                                                                        |
+| ---------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `GOOGLE_IP_RANGES_URL` | `https://www.gstatic.com/ipranges/goog.json` | Source of the IP ranges. Any URL that returns Google's `{"prefixes": [{"ipv4Prefix": …}, {"ipv6Prefix": …}]}` format works.        |
+| `IP_LIST_NAME`         | `google`                                     | Name of the Cloudflare list to create and keep in sync. This is the name you use in rule expressions.                              |
+| `ACCOUNT_ID`           | _(empty)_                                    | Account that owns the list. When empty, the worker uses the only account the token can access, and fails if it can access several. |
 
 Secrets:
 
-| Secret                 | Required | Description                                                                                                                        |
-| ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN` | Yes      | API token with **Account Filter Lists: Edit**.                                                                                     |
-| `ACCOUNT_ID`           | No       | Account that owns the list. When unset, the worker uses the only account the token can access, and fails if it can access several. |
+| Secret                 | Required | Description                                    |
+| ---------------------- | -------- | ---------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN` | Yes      | API token with **Account Filter Lists: Edit**. |
 
 The schedule is set in `triggers.crons` (default `0 */6 * * *`).
 
@@ -142,7 +143,7 @@ Cloudflare limits custom lists per account ([current limits](https:****//develop
 
 ```sh
 npm ci
-cp .dev.vars.example .dev.vars   # fill in CLOUDFLARE_API_TOKEN (and ACCOUNT_ID if needed)
+cp .dev.vars.example .dev.vars   # fill in CLOUDFLARE_API_TOKEN
 ```
 
 | Command              | Purpose                                                                 |

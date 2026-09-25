@@ -13,7 +13,9 @@
 	"upload_source_maps": true,
 	"vars": {
 		"GOOGLE_IP_RANGES_URL": "https://www.gstatic.com/ipranges/goog.json",
-		"IP_LIST_NAME": "google"
+		"IP_LIST_NAME": "google",
+		// Leave empty to use the only account CLOUDFLARE_API_TOKEN can access.
+		"ACCOUNT_ID": ""
 	},
 	"secrets": {
 		"required": [

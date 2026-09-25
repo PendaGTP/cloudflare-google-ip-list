@@ -2,10 +2,6 @@
 #
 # For production, set the same names with:
 #   npx wrangler secret put CLOUDFLARE_API_TOKEN
-#   npx wrangler secret put ACCOUNT_ID   # optional
 
 # API token with the "Account Filter Lists: Edit" permission.
 CLOUDFLARE_API_TOKEN=
-
-# Optional: only needed when the token can access more than one account.
-ACCOUNT_ID=
