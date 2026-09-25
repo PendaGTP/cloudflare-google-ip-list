@@ -29,11 +29,18 @@ jobs:
           release-type: node
           release-as: ${{ inputs.release_as }}
 
+  ci:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/ci.yaml
+    permissions:
+      contents: read
+
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    needs: release-please
+    needs: [release-please, ci]
     if: needs.release-please.outputs.release_created == 'true'
     steps:
       - name: Checkout
