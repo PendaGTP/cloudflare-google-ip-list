@@ -1,0 +1,5 @@
+CHANGELOG.md
+worker-configuration.d.ts
+package-lock.json
+dist/
+.wrangler/
