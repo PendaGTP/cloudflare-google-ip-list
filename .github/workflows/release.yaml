@@ -53,10 +53,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Generate artefact checksums
-        run: sha256sum dist/index.js > dist/index.js.sha256
-
       - name: Upload artefact
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ needs.release-please.outputs.tag_name }} dist/index.js dist/index.js.sha256
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} dist/index.js
