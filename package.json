@@ -15,11 +15,11 @@
 		"format:check": "prettier --check ."
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-plugin": "^1.4.4",
-		"oxlint": "^1.88.0",
-		"prettier": "^3.9.10",
+		"@cloudflare/vitest-plugin": "^1.8.2",
+		"oxlint": "^1.93.0",
+		"prettier": "^3.10.1",
 		"typescript": "^7.0.2",
-		"vitest": "~5.0.5",
+		"vitest": "~5.1.0",
 		"wrangler": "^4.136.1"
 	}
 }
